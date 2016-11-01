@@ -1,6 +1,6 @@
 package jdbi;
 
-import core.User;
+import core.Player;
 import org.skife.jdbi.v2.sqlobject.Bind;
 import org.skife.jdbi.v2.sqlobject.SqlQuery;
 import org.skife.jdbi.v2.sqlobject.SqlUpdate;
@@ -14,7 +14,7 @@ import org.skife.jdbi.v2.sqlobject.customizers.RegisterMapper;
 public interface PlayerDAO
 {
     @SqlQuery("select * from Player where playerId  = :playerId")
-    User findByName(@Bind("playerId") String playerId);
+    Player findByPlayerID(@Bind("playerId") String playerId);
 
     @SqlUpdate("INSERT  INTO Player (playerId, playerName, score, ip) VALUES (:playerId, :playerName, :score, :ip)")
     void insertInToDB(@Bind("playerId") String playerId, @Bind("playerName") String playerName, @Bind("score") int score, @Bind("ip") String ip);

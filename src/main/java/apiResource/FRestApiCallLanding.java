@@ -8,13 +8,8 @@ import jdbi.PlayerDAO;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by kumar on 29-10-2016.
@@ -22,28 +17,24 @@ import java.util.List;
 @Path("/FGame")
 public class FRestApiCallLanding
 {
-    WebSocket webSocket;
     private FGameRestConfig config;
     private PlayerDAO dao;
     private StringBuilder selected = new StringBuilder("");
+    private StringBuilder latest = new StringBuilder("");
     private int totalPlayer;
-    private List<Socket> client;
-    private ServerSocket echoServer;
+    private Map<String, Boolean> occupied;
+    private int x;
+    private int y;
+    private int blockingTime;
+    private int maxPlayer;
+    private int minPlayer;
+    private boolean isConfig = false;
 
     public FRestApiCallLanding(FGameRestConfig fGameRestConfig, PlayerDAO dao)
     {
         this.config = config;
         this.dao = dao;
-    }
-
-    @GET
-    @Timed
-    @Path("search1")
-    @Produces(MediaType.APPLICATION_JSON)
-    public String sayHello()
-    {
-        //final User value = dao.findByName(name.get());
-        return "{\"id\": 238, \"content\": \"Hello, World!\"}";
+        occupied = new HashMap<String, Boolean>();
     }
 
     @POST
@@ -53,6 +44,10 @@ public class FRestApiCallLanding
     @Produces(MediaType.APPLICATION_JSON)
     public Response addNewPlayer(Player player)
     {
+        if(!isConfig)
+        {
+            return null;
+        }
         StringBuilder returnStr = new StringBuilder("");
 
         String playerId = player.getPlayerId();
@@ -82,7 +77,6 @@ public class FRestApiCallLanding
         returnStr.append("-");
         returnStr.append(color);
         returnStr.append(selected.toString());
-        socketHandle();
         return Response.status(201).entity(returnStr.toString()).build();
     }
 
@@ -91,83 +85,56 @@ public class FRestApiCallLanding
     @Path("updateScore")
     public Response updateScore(String str)
     {
-        String retCode = "Success";
-        if(totalPlayer < 2)
+        int score = 0;
+        if(occupied.get(str.substring(1, str.indexOf("&"))) == null)
         {
-            retCode = "Please Wait";
-        }
-        selected.append(str);
-        DataInputStream is;
-        PrintStream os;
-        for (Socket soc : client)
-        {
-            System.out.println("socket created " + soc.getPort());
-            try
+            if (totalPlayer >= minPlayer)
             {
-                //is = new DataInputStream(soc.getInputStream());
-                os = new PrintStream(soc.getOutputStream());
-                //String line = is.readLine();
-                os.println(str.substring(1, str.length()));
-                //System.out.println(line);
-            }
-            catch (Exception e)
-            {
-                e.printStackTrace();
+                selected.append(str.substring(0, str.indexOf(":")));
+                latest.append(str.substring(1, str.indexOf(":")));
+                latest.append(":");
+                occupied.put(str.substring(1, str.indexOf("&")), true);
+                Player player = dao.findByPlayerID(str.substring((str.indexOf(":") + 1), str.length()));
+                score = player.getScore() + 10;
+                dao.updateScore(player.getPlayerId(), player.getScore() + 10);
             }
         }
-        return Response.status(200).entity(retCode).build();
+        return Response.status(200).entity(score).build();
     }
 
     @GET
-    @Path("{id}")
-    @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response getPodcastById(@PathParam("id") Long id, @QueryParam("detailed") boolean detailed)
-            throws IOException {
-
-        return Response.ok() //200
-                .header("Access-Control-Allow-Origin", "*")
-                .header("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT")
-                .allow("OPTIONS").build();
+    @Timed
+    @Path("dynamic")
+    public Response getLatest(String str)
+    {
+        String retStr = latest.toString();
+        return Response.status(200).entity(retStr).build();
     }
 
-
-    private void socketHandle()
+    @POST
+    @Timed
+    @Path("configure")
+    public Response configure(String str)
     {
-        Thread t =new Thread(new Runnable()
-        {
-            public void run()
-            {
-                String line = "Saurav";
-                DataInputStream is;
-                PrintStream os;
-                client = new ArrayList<Socket>();
-                Socket clientSocket = null;
-                try {
-                    if(echoServer == null)
-                    echoServer = new ServerSocket(9999);
-                }
-                catch (IOException e) {
-                    System.out.println(e +"Jejkwkerjwkerj");
-                }
-                try {
+        String [] attributes = str.split(":");
+        int x = Integer.parseInt(attributes[0]);
+        int y = Integer.parseInt(attributes[1]);
+        int min = Integer.parseInt(attributes[2]);
+        int max = Integer.parseInt(attributes[3]);
+        this.x = x;
+        this.y = y;
+        this.minPlayer = min;
+        this.maxPlayer = max;
+        isConfig = true;
+        return Response.status(201).entity("Configured").build();
+    }
 
-                    clientSocket = echoServer.accept();
-                    System.out.println("socket created " + clientSocket.getPort());
-                    client.add(clientSocket);
-/*                    is = new DataInputStream(clientSocket.getInputStream());
-                    os = new PrintStream(clientSocket.getOutputStream());
-                    while (true) {
-                        line = is.readLine();
-                        os.println("saurav");
-                        System.out.println(line);
-                    }*/
-                }
-                catch (IOException e) {
-                    System.out.println(e);
-                    e.printStackTrace();
-                }
-            }
-        });
-        t.start();
+    @POST
+    @Timed
+    @Path("tableWidth")
+    public Response getTableXY(String str)
+    {
+        String retStr = x + ":" + y;
+        return Response.status(201).entity(retStr).build();
     }
 }
